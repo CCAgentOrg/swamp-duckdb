@@ -217,7 +217,7 @@ export const model = {
           throw new Error(`Failed to list tables: ${stderr}`);
         }
 
-        const { columns, rows } = parseCSV(stdout);
+        const { rows } = parseCSV(stdout);
         const tableMap = new Map<string, typeof TableSchema._type>();
 
         for (const row of rows) {
@@ -339,7 +339,7 @@ export const model = {
           throw new Error(`Failed to summarize: ${stderr}`);
         }
 
-        const { columns, rows } = parseCSV(stdout);
+        const { rows } = parseCSV(stdout);
 
         const tables: typeof SummaryRow[] = [];
         for (const row of rows) {
