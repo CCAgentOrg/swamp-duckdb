@@ -1,0 +1,76 @@
+manifestVersion: 1
+name: '@cashlessconsumer/duckdb'
+version: 2026.05.21.1
+paths:
+  base: manifest
+description: >
+  Run SQL queries against local DuckDB databases from swamp workflows.
+  List tables, inspect schemas, and export query results as structured
+  data resources. Requires duckdb CLI installed.
+
+
+  ## Required Tools
+
+
+  - `duckdb` CLI (https://duckdb.org/)
+
+
+  ## Usage
+
+
+  ```bash
+
+
+  # Create the duckdb model
+
+  swamp model create @cashlessconsumer/duckdb mydb
+
+
+  # List all tables with schemas
+
+  swamp model method run mydb list_tables --input database=/path/to/data.duckdb
+
+
+  # Run a SQL query
+
+  swamp model method run mydb query --input database=/path/to/data.duckdb --input sql="SELECT * FROM t LIMIT 10"
+
+
+  # Summarize all tables with row counts
+
+  swamp model method run mydb summarize --input database=/path/to/data.duckdb
+
+  ```
+
+
+  ## Methods
+
+
+  - **list_tables** - List all tables with column names, types, and nullability
+
+  - **query** - Execute arbitrary SQL and return structured results
+
+  - **summarize** - Get a quick overview of all tables with approximate row counts
+repository: 'https://github.com/CashlessConsumer/swamp-duckdb'
+models:
+  - query.ts
+workflows: []
+vaults: []
+drivers: []
+datastores: []
+reports: []
+additionalFiles:
+  - README.md
+  - LICENSE.md
+platforms:
+  - linux-x86_64
+  - linux-aarch64
+  - darwin-x86_64
+  - darwin-aarch64
+labels:
+  - duckdb
+  - database
+  - sql
+  - analytics
+  - data
+dependencies: []
