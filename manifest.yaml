@@ -1,6 +1,6 @@
 manifestVersion: 1
 name: '@zocc/duckdb'
-version: 2026.05.21.3
+version: 2026.05.21.4
 paths:
   base: manifest
 description: >
@@ -14,7 +14,7 @@ description: >
   schemas, and export query results as structured data resources.
 
   ```bash
-  swamp model create @cashlessconsumer/duckdb mydb
+  swamp model create @zocc/duckdb mydb
   swamp model method run mydb list_tables --input database=/path/to/data.duckdb
   swamp model method run mydb query --input database=/path/to/data.duckdb --input sql="SELECT * FROM t LIMIT 10"
   swamp model method run mydb summarize --input database=/path/to/data.duckdb
@@ -27,14 +27,14 @@ description: >
   ```yaml
   # .swamp.yaml
   datastore:
-    type: "@cashlessconsumer/duckdb"
+    type: "@zocc/duckdb"
     config:
       database: "/path/to/swamp.duckdb"
       schema: "swamp"
   ```
 
   ```bash
-  export SWAMP_DATASTORE='@cashlessconsumer/duckdb:{"database":"/data/swamp.duckdb"}'
+  export SWAMP_DATASTORE='@zocc/duckdb:{"database":"/data/swamp.duckdb"}'
   ```
 
   ## Required Tools

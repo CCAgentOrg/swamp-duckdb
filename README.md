@@ -10,14 +10,14 @@ DuckDB integration for swamp — query model + embedded datastore backend.
 
 | Component | Type | Description |
 |-----------|------|-------------|
-| `@cashlessconsumer/duckdb` | Model | SQL query methods (list_tables, query, summarize, import_data, export_data) |
-| `@cashlessconsumer/duckdb-datastore` | Datastore | Swamp runtime storage backend using DuckDB |
+| `@zocc/duckdb` | Model | SQL query methods (list_tables, query, summarize, import_data, export_data) |
+| `@zocc/duckdb-datastore` | Datastore | Swamp runtime storage backend using DuckDB |
 
 ## Quick Start
 
 ```bash
-swamp extension pull @cashlessconsumer/duckdb
-swamp model create @cashlessconsumer/duckdb mydb
+swamp extension pull @zocc/duckdb
+swamp model create @zocc/duckdb mydb
 ```
 
 ## Methods
@@ -115,7 +115,7 @@ Use DuckDB as swamp's runtime storage backend instead of the default filesystem.
 ```yaml
 # .swamp.yaml
 datastore:
-  type: "@cashlessconsumer/duckdb-datastore"
+  type: "@zocc/duckdb-datastore"
   config:
     database: "/path/to/swamp-data.duckdb"
     schema: "swamp"
@@ -129,7 +129,7 @@ The datastore auto-creates the schema and locks table on first use.
 version: 1
 models:
   - name: fetch-data
-    type: "@cashlessconsumer/duckdb"
+    type: "@zocc/duckdb"
     method: import_data
     arguments:
       database: "./data/analysis.duckdb"
@@ -138,7 +138,7 @@ models:
       format: csv
 
   - name: analyze
-    type: "@cashlessconsumer/duckdb"
+    type: "@zocc/duckdb"
     method: query
     dependsOn:
       - fetch-data
@@ -147,7 +147,7 @@ models:
       sql: "SELECT category, SUM(amount) as total FROM transactions GROUP BY category"
 
   - name: publish
-    type: "@cashlessconsumer/duckdb"
+    type: "@zocc/duckdb"
     method: export_data
     dependsOn:
       - analyze
