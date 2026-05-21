@@ -1,5 +1,5 @@
 manifestVersion: 1
-name: '@cashlessconsumer/duckdb'
+name: '@zocc/duckdb'
 version: 2026.05.21.3
 paths:
   base: manifest
@@ -40,7 +40,7 @@ description: >
   ## Required Tools
 
   - `duckdb` CLI (https://duckdb.org/)
-repository: 'https://github.com/CashlessConsumer/swamp-duckdb'
+repository: 'https://github.com/CCAgentOrg/swamp-duckdb'
 models:
   - query.ts
 workflows: []

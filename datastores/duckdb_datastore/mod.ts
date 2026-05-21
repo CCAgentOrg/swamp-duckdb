@@ -293,7 +293,7 @@ function createDuckDBLock(
  * ```yaml
  * # .swamp.yaml
  * datastore:
- *   type: "@cashlessconsumer/duckdb-datastore"
+ *   type: "@zocc/duckdb-datastore"
  *   config:
  *     database: "/path/to/swamp.duckdb"
  *     schema: "swamp"
@@ -302,11 +302,11 @@ function createDuckDBLock(
  * @example
  * ```bash
  * # Environment variable
- * export SWAMP_DATASTORE='@cashlessconsumer/duckdb-datastore:{"database":"/data/swamp.duckdb"}'
+ * export SWAMP_DATASTORE='@zocc/duckdb-datastore:{"database":"/data/swamp.duckdb"}'
  * ```
  */
 export const datastore = {
-  type: "@cashlessconsumer/duckdb-datastore",
+  type: "@zocc/duckdb-datastore",
   name: "DuckDB Datastore",
   description:
     "Stores swamp runtime data in a DuckDB database file with row-based distributed locking. Embedded, local-only — no network dependency.",
@@ -343,7 +343,7 @@ export const datastore = {
                 healthy: false,
                 message: `DuckDB query failed: ${stderr.trim()}`,
                 latencyMs: Math.round(performance.now() - start),
-                datastoreType: "@cashlessconsumer/duckdb-datastore",
+                datastoreType: "@zocc/duckdb-datastore",
                 details: { database: parsed.database, schema: parsed.schema },
               };
             }
@@ -356,7 +356,7 @@ export const datastore = {
               healthy: true,
               message: "OK",
               latencyMs: Math.round(performance.now() - start),
-              datastoreType: "@cashlessconsumer/duckdb-datastore",
+              datastoreType: "@zocc/duckdb-datastore",
               details: {
                 database: dbInfo,
                 schema: parsed.schema,
@@ -368,7 +368,7 @@ export const datastore = {
               healthy: false,
               message: String(error),
               latencyMs: Math.round(performance.now() - start),
-              datastoreType: "@cashlessconsumer/duckdb-datastore",
+              datastoreType: "@zocc/duckdb-datastore",
             };
           }
         },

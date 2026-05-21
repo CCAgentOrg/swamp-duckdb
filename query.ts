@@ -196,7 +196,7 @@ type ModelContext = {
  *
  * @example
  * // Create the model
- * swamp model create @cashlessconsumer/duckdb mydb;
+ * swamp model create @zocc/duckdb mydb;
  *
  * // Query a database
  * swamp model method run mydb query \
@@ -204,7 +204,7 @@ type ModelContext = {
  *   --input sql="SELECT * FROM my_table LIMIT 10";
  */
 export const model = {
-  type: "@cashlessconsumer/duckdb",
+  type: "@zocc/duckdb",
   version: "2026.05.21.2",
   globalArguments: GlobalArgsSchema,
 

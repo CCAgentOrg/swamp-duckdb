@@ -79,7 +79,7 @@ By default, swamp stores runtime data (model outputs, locks, state) on the files
 ```yaml
 # .swamp.yaml
 datastore:
-  type: "@cashlessconsumer/duckdb-datastore"
+  type: "@zocc/duckdb-datastore"
   config:
     database: "/path/to/swamp-data.duckdb"
     schema: "swamp"
@@ -119,7 +119,7 @@ No database server needed. DuckDB runs in-process. Import a Parquet file from S3
 ## Installation
 
 ```bash
-swamp extension pull @cashlessconsumer/duckdb
+swamp extension pull @zocc/duckdb
 ```
 
 ## Requirements
