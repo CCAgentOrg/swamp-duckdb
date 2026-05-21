@@ -62,9 +62,40 @@ const SummarySchema = z.object({
   fetchedAt: z.string(),
 });
 
+const ImportResultSchema = z.object({
+  database: z.string(),
+  source: z.string(),
+  table: z.string(),
+  format: z.string(),
+  rowsLoaded: z.number(),
+  columns: z.array(z.string()),
+  durationMs: z.number(),
+  fetchedAt: z.string(),
+});
+
+const ExportResultSchema = z.object({
+  database: z.string(),
+  sql: z.string(),
+  destination: z.string(),
+  format: z.string(),
+  rowsExported: z.number(),
+  fileSize: z.number(),
+  durationMs: z.number(),
+  fetchedAt: z.string(),
+});
+
 // =============================================================================
 // Helper Functions
 // =============================================================================
+
+function detectFormat(pathOrUrl: string): string {
+  const lower = pathOrUrl.toLowerCase();
+  if (lower.endsWith(".csv")) return "csv";
+  if (lower.endsWith(".json")) return "json";
+  if (lower.endsWith(".ndjson") || lower.endsWith(".jsonl")) return "ndjson";
+  if (lower.endsWith(".parquet")) return "parquet";
+  return "csv";
+}
 
 async function runDuckDB(
   dbPath: string,
@@ -174,7 +205,7 @@ type ModelContext = {
  */
 export const model = {
   type: "@cashlessconsumer/duckdb",
-  version: "2026.05.21.1",
+  version: "2026.05.21.2",
   globalArguments: GlobalArgsSchema,
 
   resources: {
@@ -193,6 +224,18 @@ export const model = {
     summary: {
       description: "High-level summary of all tables in a database",
       schema: SummarySchema,
+      lifetime: "1h" as const,
+      garbageCollection: 10,
+    },
+    import_result: {
+      description: "Result of importing data into a DuckDB table",
+      schema: ImportResultSchema,
+      lifetime: "1h" as const,
+      garbageCollection: 10,
+    },
+    export_result: {
+      description: "Result of exporting data from a DuckDB database",
+      schema: ExportResultSchema,
       lifetime: "1h" as const,
       garbageCollection: 10,
     },
@@ -381,6 +424,268 @@ export const model = {
             database: args.database,
             tables,
             totalTables: tables.length,
+            fetchedAt: new Date().toISOString(),
+          },
+        );
+        return { dataHandles: [handle] };
+      },
+    },
+
+    import_data: {
+      description:
+        "Import data from a file (CSV, JSON, Parquet) into a DuckDB table",
+      arguments: z.object({
+        database: z.string().describe("Path to the DuckDB database file"),
+        source: z.string().describe(
+          "Path or URL to the source file (CSV, JSON, NDJSON, or Parquet)",
+        ),
+        table: z.string().describe("Target table name to import into"),
+        format: z.string().default("auto").describe(
+          "Source format: csv, json, ndjson, parquet, or auto (detect from extension)",
+        ),
+        create_table: z.boolean().default(true).describe(
+          "CREATE TABLE IF NOT EXISTS before importing",
+        ),
+        delimiter: z.string().default(",").describe(
+          "Column delimiter for CSV files (default: comma)",
+        ),
+        header: z.boolean().default(true).describe(
+          "Whether the source CSV has a header row",
+        ),
+      }),
+      execute: async (
+        args: {
+          database: string;
+          source: string;
+          table: string;
+          format: string;
+          create_table: boolean;
+          delimiter: string;
+          header: boolean;
+        },
+        context: ModelContext,
+      ) => {
+        const fmt = args.format === "auto"
+          ? detectFormat(args.source)
+          : args.format.toLowerCase();
+        const start = performance.now();
+
+        let sql: string;
+
+        switch (fmt) {
+          case "parquet": {
+            if (args.create_table) {
+              sql =
+                `CREATE TABLE IF NOT EXISTS "${args.table}" AS SELECT * FROM read_parquet('${args.source}')`;
+            } else {
+              sql =
+                `INSERT INTO "${args.table}" SELECT * FROM read_parquet('${args.source}')`;
+            }
+            break;
+          }
+          case "json": {
+            if (args.create_table) {
+              sql =
+                `CREATE TABLE IF NOT EXISTS "${args.table}" AS SELECT * FROM read_json_auto('${args.source}')`;
+            } else {
+              sql =
+                `INSERT INTO "${args.table}" SELECT * FROM read_json_auto('${args.source}')`;
+            }
+            break;
+          }
+          case "ndjson": {
+            if (args.create_table) {
+              sql =
+                `CREATE TABLE IF NOT EXISTS "${args.table}" AS SELECT * FROM read_ndjson('${args.source}')`;
+            } else {
+              sql =
+                `INSERT INTO "${args.table}" SELECT * FROM read_ndjson('${args.source}')`;
+            }
+            break;
+          }
+          case "csv":
+          default: {
+            const delim = args.delimiter === "\\t" ? "\\t" : args.delimiter;
+            if (args.create_table) {
+              sql =
+                `CREATE TABLE IF NOT EXISTS "${args.table}" AS SELECT * FROM read_csv_auto('${args.source}', header=${args.header}, delim='${delim}')`;
+            } else {
+              sql =
+                `INSERT INTO "${args.table}" SELECT * FROM read_csv_auto('${args.source}', header=${args.header}, delim='${delim}')`;
+            }
+            break;
+          }
+        }
+
+        const { success, stderr } = await runDuckDB(args.database, sql);
+        const durationMs = Math.round(performance.now() - start);
+
+        if (!success) {
+          throw new Error(`Import failed: ${stderr}`);
+        }
+
+        const columns: string[] = [];
+        let rowsLoaded = 0;
+
+        const colResult = await runDuckDB(
+          args.database,
+          `SELECT column_name FROM information_schema.columns WHERE table_schema='main' AND table_name='${args.table}' ORDER BY ordinal_position`,
+        );
+        if (colResult.success) {
+          const colRows = parseCSV(colResult.stdout);
+          columns.push(
+            ...colRows.rows.map((r) => String(r["column_name"] ?? "")),
+          );
+        }
+
+        const countResult = await runDuckDB(
+          args.database,
+          `SELECT COUNT(*)::VARCHAR AS cnt FROM "${args.table}"`,
+        );
+        if (countResult.success) {
+          const countRows = parseCSV(countResult.stdout);
+          rowsLoaded = Number(countRows.rows[0]?.["cnt"] ?? 0);
+        }
+
+        context.logger.info(
+          "Imported {rows} rows into {table} from {source} ({fmt}) in {ms}ms",
+          {
+            rows: rowsLoaded,
+            table: args.table,
+            source: args.source,
+            fmt,
+            ms: durationMs,
+          },
+        );
+
+        const handle = await context.writeResource(
+          "import_result",
+          `${args.table}-${Date.now()}`,
+          {
+            database: args.database,
+            source: args.source,
+            table: args.table,
+            format: fmt,
+            rowsLoaded,
+            columns,
+            durationMs,
+            fetchedAt: new Date().toISOString(),
+          },
+        );
+        return { dataHandles: [handle] };
+      },
+    },
+
+    export_data: {
+      description:
+        "Export query results or an entire table to CSV, JSON, or Parquet",
+      arguments: z.object({
+        database: z.string().describe("Path to the DuckDB database file"),
+        destination: z.string().describe(
+          "Output file path (extension determines format: .csv, .json, .parquet)",
+        ),
+        sql: z.string().optional().describe(
+          "SQL query to export (use instead of table)",
+        ),
+        table: z.string().optional().describe(
+          "Table name to export (use instead of sql)",
+        ),
+        format: z.string().default("auto").describe(
+          "Output format: csv, json, parquet, or auto (detect from destination extension)",
+        ),
+        delimiter: z.string().default(",").describe(
+          "Column delimiter for CSV output (default: comma)",
+        ),
+        header: z.boolean().default(true).describe(
+          "Whether to include header row in CSV output",
+        ),
+      }),
+      execute: async (
+        args: {
+          database: string;
+          destination: string;
+          sql?: string;
+          table?: string;
+          format: string;
+          delimiter: string;
+          header: boolean;
+        },
+        context: ModelContext,
+      ) => {
+        const destination = args.destination!;
+        const fmt = args.format === "auto"
+          ? detectFormat(destination)
+          : args.format.toLowerCase();
+
+        if (!args.sql && !args.table) {
+          throw new Error("Must provide either 'sql' or 'table' to export");
+        }
+
+        const query = args.sql
+          ? args.sql.trim().replace(/;+\s*$/, "")
+          : `SELECT * FROM "${args.table}"`;
+
+        const start = performance.now();
+        let sql: string;
+        const delim = args.delimiter === "\\t" ? "\\t" : args.delimiter;
+
+        switch (fmt) {
+          case "parquet": {
+            sql = `COPY (${query}) TO '${destination}' (FORMAT PARQUET)`;
+            break;
+          }
+          case "json": {
+            sql =
+              `COPY (${query}) TO '${destination}' (FORMAT JSON, ARRAY true)`;
+            break;
+          }
+          case "csv":
+          default: {
+            sql =
+              `COPY (${query}) TO '${destination}' (FORMAT CSV, HEADER ${args.header}, DELIM '${delim}')`;
+            break;
+          }
+        }
+
+        const { stdout, success, stderr } = await runDuckDB(args.database, sql);
+        const durationMs = Math.round(performance.now() - start);
+
+        if (!success) {
+          throw new Error(`Export failed: ${stderr}`);
+        }
+
+        const rowsExported = Number(stdout.trim() || 0);
+        let fileSize = 0;
+
+        try {
+          const stat = await Deno.stat(destination);
+          fileSize = stat.size;
+        } catch {
+          fileSize = 0;
+        }
+
+        context.logger.info(
+          "Exported {rows} rows to {dest} ({fmt}, {size} bytes) in {ms}ms",
+          {
+            rows: rowsExported,
+            dest: destination,
+            fmt,
+            size: fileSize,
+            ms: durationMs,
+          },
+        );
+
+        const handle = await context.writeResource(
+          "export_result",
+          `${fmt}-${Date.now()}`,
+          {
+            database: args.database,
+            sql: query,
+            destination,
+            format: fmt,
+            rowsExported,
+            fileSize,
+            durationMs,
             fetchedAt: new Date().toISOString(),
           },
         );
